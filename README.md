@@ -51,15 +51,21 @@ Example
 ---
 
 ## 📦 Installation
+pip install requirements.txt
+
 
 ---
 
 ## 🔑 Environment
 Create `.env`
+GROQ_API_KEY=your_key_here
 
 ---
 
+
 ## ▶️ Run
+streamlit run main.py
+
 
 ---
 
