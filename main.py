@@ -1,31 +1,44 @@
 import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
-from gtts import gTTS
 import os
 import tempfile
 
-# ---------- config ----------
+#config
 MAX_MEMORY = 15
 CHAT_MODEL = "llama-3.3-70b-versatile"
 STT_MODEL = "whisper-large-v3"
+TTV_MODEL = "canopylabs/orpheus-v1-english"
 
-# ---------- setup ----------
 load_dotenv()
-
-api_key = os.getenv("GROQ_API_KEY") or st.secrets["GROQ_API_KEY"]
-client = Groq(api_key=api_key)
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 st.set_page_config(
     page_title="Voice AI",
     layout="centered"
 )
 
-# ---------- memory ----------
+# voice function
+def speak(text):
+    response = client.audio.speech.create(
+        model=TTV_MODEL,
+        voice="autumn",          # or autumn / hannah / etc
+        input=text,
+        response_format="wav"    # REQUIRED
+    )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+        f.write(response.read())
+        audio_file = f.name
+
+    st.audio(audio_file, format="audio/wav")
+
+
+# memeory -> Sliding window...
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# ---------- UI ----------
+# daam UI in streamlit 😂😂
 st.title("🎙️ Voice AI")
 st.caption("Speak. Remember. Respond.")
 
@@ -38,12 +51,10 @@ audio = st.audio_input("Hold to record and release")
 
 # ---------- logic ----------
 if audio:
-    # save input audio
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
         f.write(audio.getbuffer())
         audio_path = f.name
 
-    # STT
     with st.spinner("Transcribing"):
         transcript = client.audio.transcriptions.create(
             model=STT_MODEL,
@@ -52,7 +63,7 @@ if audio:
 
     user_text = transcript.text
 
-    # store user message
+    # save user message
     st.session_state.messages.append(
         {"role": "user", "content": user_text}
     )
@@ -61,7 +72,6 @@ if audio:
     with st.chat_message("user"):
         st.markdown(user_text)
 
-    # LLM
     with st.spinner("Thinking"):
         response = client.chat.completions.create(
             model=CHAT_MODEL,
@@ -80,7 +90,7 @@ if audio:
 
     ai_text = response.choices[0].message.content
 
-    # store assistant message
+    # save assistant message
     st.session_state.messages.append(
         {"role": "assistant", "content": ai_text}
     )
@@ -89,8 +99,4 @@ if audio:
     with st.chat_message("assistant"):
         st.markdown(ai_text)
 
-    # ---------- browser TTS ----------
-    tts = gTTS(text=ai_text, lang="en")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as audio_out:
-        tts.save(audio_out.name)
-        st.audio(audio_out.name, format="audio/mp3")
+    speak(ai_text)
